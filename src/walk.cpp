@@ -16,7 +16,8 @@ struct Walker {
   vector<Clause *> broken; // currently unsatisfied clauses
   double epsilon;          // smallest considered score
   vector<double> table;    // break value to score table
-  vector<double> scores;   // scores of candidate literals
+  vector<double> scores;   // scores of candidate literals 
+  int64_t ticks;	   // ticks to approximate run time
 
   double score (unsigned); // compute score from break count
 
@@ -610,8 +611,11 @@ int Internal::walk_round (int64_t limit, bool prev) {
       stats.walk.flips++;
       stats.walk.broken += broken;
       Clause *c = walk_pick_clause (walker);
+      walker.ticks++;
       const int lit = walk_pick_lit (walker, c);
+      walker.ticks++;
       walk_flip_lit (walker, lit);
+      walker.ticks++;
       broken = walker.broken.size ();
       LOG ("now have %" PRId64 " broken clauses in total", broken);
       if (broken >= minimum)
@@ -685,6 +689,8 @@ int Internal::walk_round (int64_t limit, bool prev) {
     force_phase_messages = false;
   }
 #endif
+  // adding walker.ticks to stats
+  stats.ticks.walk += walker.ticks;
 
   return res;
 }

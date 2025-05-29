@@ -52,13 +52,15 @@ void Stats::print (Internal *internal) {
   propagations += stats.propagations.transred;
   propagations += stats.propagations.vivify;
   propagations += stats.propagations.walk;
-
+  
+  // adding walkticks to the statistics (Lea)
+  int64_t walkticks = stats.ticks.walk;
   int64_t vivified = stats.vivifysubs + stats.vivifystrs;
   int64_t searchticks = stats.ticks.search[0] + stats.ticks.search[1];
   int64_t inprobeticks = stats.ticks.vivify + stats.ticks.probe +
                          stats.ticks.factor + stats.ticks.ternary +
                          stats.ticks.sweep;
-  int64_t totalticks = searchticks + inprobeticks;
+  int64_t totalticks = searchticks + inprobeticks + walkticks; // adding them to total ticks
 
   size_t extendbytes = internal->external->extension.size ();
   extendbytes *= sizeof (int);
@@ -616,6 +618,8 @@ void Stats::print (Internal *internal) {
        stats.ticks.ternary, percent (stats.ticks.ternary, searchticks));
   PRT ("   vivifyticks:  %15" PRId64 "   %10.2f %%  searchticks",
        stats.ticks.vivify, percent (stats.ticks.vivify, searchticks));
+  PRT ("   walkticks:    %15" PRId64 "   %10.2f %%  walkticks",
+       stats.ticks.walk, percent (stats.ticks.walk, searchticks)); // added percentage walk ticks
   if (all) {
     PRT ("tier recomputed: %15" PRId64 "   %10.2f    interval",
          stats.tierecomputed,
