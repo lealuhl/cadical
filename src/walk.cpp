@@ -326,6 +326,7 @@ void Internal::walk_flip_lit (Walker &walker, int lit) {
       // in 'walk', if it is interrupted in this loop.
 
       count = ratio; // Starting counting down again.
+      walker.ticks++;
       walker.propagations++;
       stats.propagations.walk++;
     }
@@ -460,7 +461,6 @@ int Internal::walk_round (int64_t limit, bool prev) {
   // Instantiate data structures for this local search round.
   //
   Walker walker (internal, average_size, limit);
-
   bool failed = false; // Inconsistent assumptions?
 
   level = 1; // Assumed variables assigned at level 1.
