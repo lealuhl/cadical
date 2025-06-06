@@ -17,7 +17,7 @@ struct Walker {
   double epsilon;          // smallest considered score
   vector<double> table;    // break value to score table
   vector<double> scores;   // scores of candidate literals 
-  int64_t ticks;	   // ticks to approximate run time
+  int64_t ticks;	         // ticks to approximate run time
 
   double score (unsigned); // compute score from break count
 
@@ -63,8 +63,9 @@ inline static double fitcbval (double size) {
 
 Walker::Walker (Internal *i, double size, int64_t l)
     : internal (i), random (internal->opts.seed), // global random seed
-      propagations (0), limit (l) {
+      propagations (0), limit (l),  ticks(0) {
   random += internal->stats.walk.count; // different seed every time
+
 
   // This is the magic constant in ProbSAT (also called 'CB'), which we pick
   // according to the average size every second invocation and otherwise
@@ -102,6 +103,10 @@ Clause *Internal::walk_pick_clause (Walker &walker) {
     size = INT_MAX;
   int pos = walker.random.pick_int (0, size - 1);
   Clause *res = walker.broken[pos];
+  // TODO: können wir vielleicht so stehen lassen, da clause ja ggf später angeschaut wird
+  // REASON: hier erhöhen wir, weil wir von walker.broken nicht nur die Größe anschauen,
+  // sondern dann auch auf die einzelnen clauses zugreifen
+  walker.ticks++;
   LOG (res, "picking random position %d", pos);
   return res;
 }
@@ -111,7 +116,7 @@ Clause *Internal::walk_pick_clause (Walker &walker) {
 // Compute the number of clauses which would be become unsatisfied if 'lit'
 // is flipped and set to false.  This is called the 'break-count' of 'lit'.
 
-unsigned Internal::walk_break_value (int lit) {
+unsigned Internal::walk_break_value (int lit, int64_t &walkerticks) {
 
   require_mode (WALK);
   assert (val (lit) > 0);
@@ -128,6 +133,8 @@ unsigned Internal::walk_break_value (int lit) {
     }
 
     Clause *c = w.clause;
+    // REASON: we are looking at the clause here
+    walkerticks++;
     assert (lit == c->literals[0]);
 
     // Now try to find a second satisfied literal starting at 'literals[1]'
@@ -198,7 +205,7 @@ int Internal::walk_pick_lit (Walker &walker, Clause *c) {
     }
     assert (active (lit));
     propagations++;
-    unsigned tmp = walk_break_value (-lit);
+    unsigned tmp = walk_break_value (-lit, walker.ticks);
     double score = walker.score (tmp);
     LOG ("literal %d break-count %u score %g", lit, tmp, score);
     walker.scores.push_back (score);
@@ -273,6 +280,9 @@ void Internal::walk_flip_lit (Walker &walker, int lit) {
     const double ratio = clause_variable_ratio ();
     const auto eou = walker.broken.end ();
     auto j = walker.broken.begin (), i = j;
+    walker.ticks += 1 + cache_lines (walker.broken.size (), sizeof (Clause *)); 
+    // TODO: is this in the right place here? we want to look at all broken clauses, which is expensive, so we should adjust ticks, 
+    // but i'm unsure if this is the right place
 #ifdef LOGGING
     int64_t made = 0;
 #endif
@@ -281,6 +291,7 @@ void Internal::walk_flip_lit (Walker &walker, int lit) {
     while (i != eou) {
 
       Clause *d = *j++ = *i++;
+      walker.ticks++;
 
       int *literals = d->literals, prev = 0;
 
@@ -303,6 +314,8 @@ void Internal::walk_flip_lit (Walker &walker, int lit) {
         literals[0] = lit;
         LOG (d, "made");
         watch_literal (literals[0], literals[1], d);
+        walker.ticks += 2; 
+        // TODO: added here to account for pushing clauses on 2 stacks (kann man ggf wieder weg machen)
 #ifdef LOGGING
         made++;
 #endif
@@ -326,12 +339,13 @@ void Internal::walk_flip_lit (Walker &walker, int lit) {
       // in 'walk', if it is interrupted in this loop.
 
       count = ratio; // Starting counting down again.
-      walker.ticks++;
       walker.propagations++;
       stats.propagations.walk++;
     }
     LOG ("made %" PRId64 " clauses by flipping %d", made, lit);
-    walker.broken.resize (j - walker.broken.begin ());
+    walker.broken.resize (j - walker.broken.begin ()); 
+    // TODO: should we count resize to the ticks or is this simply a "cutting away from the matrix, 
+    // we are not looking at any clauses" kind of operation????
   }
 
   // Finally add all new unsatisfied (broken) clauses.
@@ -342,12 +356,16 @@ void Internal::walk_flip_lit (Walker &walker, int lit) {
 #ifdef LOGGING
     int64_t broken = 0;
 #endif
-    Watches &ws = watches (-lit);
+    Watches &ws = watches (-lit); 
+    // REASON: counting ticks here because we create the watches(-lit) list here so we have to look 
+    // at all clauses in the cache
+    walker.ticks += 1 + cache_lines (ws.size (), sizeof (Clause *));
 
     LOG ("trying to break %zd watched clauses", ws.size ());
 
     for (const auto &w : ws) {
       Clause *d = w.clause;
+      walker.ticks++; // REASON: hier schauen wir dann die clauses tatsächlich an
       LOG (d, "unwatch %d in", -lit);
       int *literals = d->literals, replacement = 0, prev = -lit;
       assert (literals[0] == -lit);
@@ -441,6 +459,9 @@ int Internal::walk_round (int64_t limit, bool prev) {
   double size = 0;
   int64_t n = 0;
   for (const auto c : clauses) {
+    // TODO: Initialisierung erstmal ignorieren, ggf wenn sie doch zu teuer ist kann man hier 
+    // stats ticks hoch zählen und dann sobald der walker initialisiert wurde auf die walker.ticks 
+    // addieren und dann die walker ticks als abbruchbedingung nutzen
     if (c->garbage)
       continue;
     if (c->redundant) {
@@ -522,6 +543,7 @@ int Internal::walk_round (int64_t limit, bool prev) {
     int64_t watched = 0;
 #endif
     for (const auto c : clauses) {
+      walker.ticks++;
 
       if (c->garbage)
         continue;
@@ -569,7 +591,7 @@ int Internal::walk_round (int64_t limit, bool prev) {
       } else {
         assert (satisfiable); // at least one non-assumed variable ...
         LOG (c, "broken");
-        walker.broken.push_back (c);
+        walker.broken.push_back (c); 
       }
     }
 #ifdef LOGGING
@@ -611,11 +633,8 @@ int Internal::walk_round (int64_t limit, bool prev) {
       stats.walk.flips++;
       stats.walk.broken += broken;
       Clause *c = walk_pick_clause (walker);
-      walker.ticks++;
       const int lit = walk_pick_lit (walker, c);
-      walker.ticks++;
       walk_flip_lit (walker, lit);
-      walker.ticks++;
       broken = walker.broken.size ();
       LOG ("now have %" PRId64 " broken clauses in total", broken);
       if (broken >= minimum)
@@ -697,6 +716,10 @@ int Internal::walk_round (int64_t limit, bool prev) {
 
 void Internal::walk () {
   START_INNER_WALK ();
+  // TODO:
+  // changing stats.propagations.search to walker.ticks
+  // commenting out walkmineff and walkmaxeff
+  // testing
   int64_t limit = stats.propagations.search;
   limit *= 1e-3 * opts.walkeffort;
   if (limit < opts.walkmineff)

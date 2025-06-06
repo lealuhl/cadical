@@ -59,8 +59,8 @@ void Stats::print (Internal *internal) {
   int64_t searchticks = stats.ticks.search[0] + stats.ticks.search[1];
   int64_t inprobeticks = stats.ticks.vivify + stats.ticks.probe +
                          stats.ticks.factor + stats.ticks.ternary +
-                         stats.ticks.sweep;
-  int64_t totalticks = searchticks + inprobeticks + walkticks; // adding them to total ticks
+                         stats.ticks.sweep + stats.ticks.walk;
+  int64_t totalticks = searchticks + inprobeticks; // adding them to total ticks
 
   size_t extendbytes = internal->external->extension.size ();
   extendbytes *= sizeof (int);
