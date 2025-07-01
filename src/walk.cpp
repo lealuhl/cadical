@@ -314,7 +314,7 @@ void Internal::walk_flip_lit (Walker &walker, int lit) {
         literals[0] = lit;
         LOG (d, "made");
         watch_literal (literals[0], literals[1], d);
-        walker.ticks += 2; 
+        walker.ticks += 1; // +1 statt +2 
         // TODO: added here to account for pushing clauses on 2 stacks (kann man ggf wieder weg machen)
 #ifdef LOGGING
         made++;
@@ -626,7 +626,7 @@ int Internal::walk_round (int64_t limit, bool prev) {
     int64_t flips = 0;
 #endif
     while (!terminated_asynchronously () && !walker.broken.empty () &&
-           walker.propagations < walker.limit) {
+           walker.ticks < walker.limit) { // TODO change to walker.ticks here
 #ifndef QUIET
       flips++;
 #endif
@@ -720,7 +720,8 @@ void Internal::walk () {
   // changing stats.propagations.search to walker.ticks
   // commenting out walkmineff and walkmaxeff
   // testing
-  int64_t limit = stats.propagations.search;
+  int64_t limit = stats.ticks.search[0] + stats.ticks.search[0] - last.walk.ticks;
+  last.walk.ticks = stats.ticks.search[0] + stats.ticks.search[0];
   limit *= 1e-3 * opts.walkeffort;
   if (limit < opts.walkmineff)
     limit = opts.walkmineff;

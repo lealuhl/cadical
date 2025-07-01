@@ -1,0 +1,18 @@
+Vorbereitung Projekttreffen 01.07.25
+Was habe ich gemacht:
+- Vergleich von Walk mit den Benchmarks, wo sehr viel walk vorkommt
+- Vergleich von Walk mit 20 anderen Benchmarks
+- hier war jeweils noch stats.propagations als limit gesetzt
+- dann habe ich stats.ticks.walk als limit genommen und nochmal die gleichen Benchmarks getestet
+- hierfür war mineffort und maxeffort erstmal auskommentiert, um nicht das Ergebnis zu verfälschen, weil ich wollte nicht, dass wir dann zB zu viel/zu wenig walk bekommen, weil diese Boundaries als limit genutzt wurden statt der eigentlichen ticks Anzahl
+- dann hab ich beides wieder rein genommen und gemerkt, dass es keinen Unterschied macht, weil die boundaries ja 0 und 1e7 sind
+- dann hab ich maxeffort/mineffort  noch etwas angepasst
+
+ToDo:
+- Vergleichsgrafik für: walk normal in cadical, walk basierend auf ticks aber ohne min/max, walk basierend auf ticks aber mit min/max
+
+Offene Fragen:
+- was für eine "Einheit" hat walkmineff/walkmaxeff?
+
+
+Notizen Projekttreffen 01.07.25
