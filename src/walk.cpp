@@ -122,7 +122,7 @@ unsigned Internal::walk_break_value (int lit, int64_t &walkerticks) {
   assert (val (lit) > 0);
 
   unsigned res = 0; // The computed break-count of 'lit'.
-
+  walkerticks += 1 + cache_lines (watches(lit).size (), sizeof (Clause *));
   for (auto &w : watches (lit)) {
     assert (w.blit != lit);
     if (val (w.blit) > 0)
@@ -193,6 +193,8 @@ unsigned Internal::walk_break_value (int lit, int64_t &walkerticks) {
 // decision level one, while the other variables are assigned at two.
 
 int Internal::walk_pick_lit (Walker &walker, Clause *c) {
+  START(walkpick);
+  const int64_t old = ++walker.ticks;
   LOG ("picking literal by break-count");
   assert (walker.scores.empty ());
   double sum = 0;
@@ -240,12 +242,16 @@ int Internal::walk_pick_lit (Walker &walker, Clause *c) {
   }
   walker.scores.clear ();
   LOG ("picking literal %d by break-count", res);
+  STOP (walkpick);
+  stats.ticks.walkpick += walker.ticks - old;
   return res;
 }
 
 /*------------------------------------------------------------------------*/
 
 void Internal::walk_flip_lit (Walker &walker, int lit) {
+  START(walkflip);
+  const int64_t old = walker.ticks;
 
   require_mode (WALK);
   LOG ("flipping assign %d", lit);
@@ -280,7 +286,7 @@ void Internal::walk_flip_lit (Walker &walker, int lit) {
     const double ratio = clause_variable_ratio ();
     const auto eou = walker.broken.end ();
     auto j = walker.broken.begin (), i = j;
-    walker.ticks += 1 + cache_lines (walker.broken.size (), sizeof (Clause *)); 
+//    walker.ticks += 1 + cache_lines (walker.broken.size (), sizeof (Clause *));
     // TODO: is this in the right place here? we want to look at all broken clauses, which is expensive, so we should adjust ticks, 
     // but i'm unsure if this is the right place
 #ifdef LOGGING
@@ -403,6 +409,8 @@ void Internal::walk_flip_lit (Walker &walker, int lit) {
     LOG ("broken %" PRId64 " clauses by flipping %d", broken, lit);
     ws.clear ();
   }
+  STOP(walkflip);
+  stats.ticks.walkflip += walker.ticks - old;
 }
 
 /*------------------------------------------------------------------------*/
@@ -410,9 +418,11 @@ void Internal::walk_flip_lit (Walker &walker, int lit) {
 // Check whether to save the current phases as new global minimum.
 
 inline void Internal::walk_save_minimum (Walker &walker) {
+
   int64_t broken = walker.broken.size ();
   if (broken >= stats.walk.minimum)
     return;
+  START (walksavemin);
   VERBOSE (3, "new global minimum %" PRId64 "", broken);
   stats.walk.minimum = broken;
   for (auto i : vars) {
@@ -420,12 +430,13 @@ inline void Internal::walk_save_minimum (Walker &walker) {
     if (tmp)
       phases.min[i] = phases.saved[i] = tmp;
   }
+  STOP (walksavemin);
 }
 
 /*------------------------------------------------------------------------*/
 
 int Internal::walk_round (int64_t limit, bool prev) {
-
+  START(walkinit);
   backtrack ();
   if (propagated < trail.size () && !propagate ()) {
     LOG ("empty clause after root level propagation");
@@ -474,6 +485,7 @@ int Internal::walk_round (int64_t limit, bool prev) {
     n++;
   }
   double average_size = relative (size, n);
+  STOP(walkinit);
 
   PHASE ("walk", stats.walk.count,
          "%" PRId64 " clauses average size %.2f over %d variables", n,
@@ -642,6 +654,7 @@ int Internal::walk_round (int64_t limit, bool prev) {
       minimum = broken;
       VERBOSE (3, "new phase minimum %" PRId64 " after %" PRId64 " flips",
                minimum, flips);
+
       walk_save_minimum (walker);
     }
 

@@ -37,6 +37,8 @@ struct Stats {
     int64_t ternary = 0;
     int64_t vivify = 0;
     int64_t walk = 0; // ticks added to approximate walk
+    int64_t walkflip = 0; // ticks added to approximate walk
+    int64_t walkpick = 0; // ticks added to approximate walk
   } ticks;
 
   struct {

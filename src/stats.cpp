@@ -620,6 +620,10 @@ void Stats::print (Internal *internal) {
        stats.ticks.vivify, percent (stats.ticks.vivify, searchticks));
   PRT ("   walkticks:    %15" PRId64 "   %10.2f %%  searchticks",
        stats.ticks.walk, percent (stats.ticks.walk, searchticks)); // added percentage walk ticks
+  PRT ("   walkflipticks:    %15" PRId64 "   %10.2f %%  searchticks",
+       stats.ticks.walkflip, percent (stats.ticks.walkflip, searchticks)); // added percentage walk ticks
+  PRT ("   walkpickticks:    %15" PRId64 "   %10.2f %%  searchticks",
+       stats.ticks.walkpick, percent (stats.ticks.walkpick, searchticks)); // added percentage walk ticks
   if (all) {
     PRT ("tier recomputed: %15" PRId64 "   %10.2f    interval",
          stats.tierecomputed,
